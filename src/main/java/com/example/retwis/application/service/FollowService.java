@@ -1,16 +1,18 @@
 package com.example.retwis.application.service;
 
+import com.example.retwis.infrastructure.redis.repository.FollowRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 @RequiredArgsConstructor
 @Service
 public class FollowService {
 
-    private final RedisTemplate<String, String> redisTemplate;
-    public void follow(Integer followerId, Integer followerId1) {
+    private final FollowRepository followRepository;
 
+    public void follow(String followId, String followerId) {
+        long cur = System.currentTimeMillis();
+        followRepository.follow(followId, followerId, cur);
+        followRepository.follower(followerId, followId, cur);
     }
-    // A follow B with unixtimestamp
 }

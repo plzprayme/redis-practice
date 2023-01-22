@@ -1,16 +1,22 @@
 package com.example.retwis.infrastructure.redis;
 
-import io.lettuce.core.ClientOptions;
-import io.lettuce.core.TimeoutOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
+import java.util.Map;
+
+import static java.util.Collections.singletonMap;
+import static org.springframework.data.redis.cache.RedisCacheConfiguration.defaultCacheConfig;
 
 @Configuration
 public class RedisConfig {
@@ -22,47 +28,62 @@ public class RedisConfig {
     @Value("${spring.data.redis.database}")
     private int database;
 
-
-
     @Bean
-    public LettuceConnectionFactory getRedisConnectionFactory() {
+    @Scope(value = "prototype")
+    public RedisConnectionFactory connectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(host, port);
         config.setDatabase(database);
         return new LettuceConnectionFactory(config);
-//        return new LettuceConnectionFactory(getRedisStandaloneConfiguration(), getLettuceClientConfiguration());
     }
 
-//    @Bean
-//    public RedisTemplate<String, String> redisTemplate(LettuceConnectionFactory redisConnectionFacotry) {
-//        RedisTemplate<String, String> t = new RedisTemplate<>();
-//        t.setConnectionFactory(redisConnectionFacotry);
-//        return t;
-//    }
-//
-//    private RedisStandaloneConfiguration getRedisStandaloneConfiguration() {
-//        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(host, port);
-//        config.setDatabase(database);
-//        return getRedisStandaloneConfiguration();
-//    }
-//
-//    private LettuceClientConfiguration getLettuceClientConfiguration() {
-//        return LettuceClientConfiguration.builder()
-//                .clientName("Retwis")
-//                .clientOptions(getClientOptions())
-//                .build();
-//    }
-//
-//    private ClientOptions getClientOptions() {
-//        return ClientOptions.builder()
-//                .timeoutOptions(timeoutOptions())
-//                .build();
-//    }
-//
-//    private TimeoutOptions timeoutOptions() {
-//        return TimeoutOptions.builder()
-//                .connectionTimeout()
-//                .timeoutCommands(true)
-//                .fixedTimeout(Duration.ofSeconds(5L))
-//                .build();
-//    }
+    @Bean
+    public RedisTemplate<?, ?> followRedisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<byte[], byte[]> t = new RedisTemplate<>();
+        t.setConnectionFactory(connectionFactory);
+        t.setEnableTransactionSupport(true);
+        t.setKeySerializer(new StringRedisSerializer());
+        t.setValueSerializer(new StringRedisSerializer());
+        return t;
+    }
+
+    @Bean
+    public RedisCacheManager followCacheManager(RedisConnectionFactory connectionFactory) {
+        return RedisCacheManager.builder(connectionFactory)
+                .cacheDefaults(redisCacheConfig(Duration.ZERO, "follow::"))
+                .withInitialCacheConfigurations(cacheConfigurations())
+                .transactionAware()
+                .build();
+    }
+
+    @Bean
+    public RedisTemplate<?, ?> followerRedisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<byte[], byte[]> t = new RedisTemplate<>();
+        t.setConnectionFactory(connectionFactory);
+        t.setEnableTransactionSupport(true);
+        t.setKeySerializer(new StringRedisSerializer());
+        t.setValueSerializer(new StringRedisSerializer());
+        return t;
+    }
+
+    @Bean
+    public RedisCacheManager followerCacheManager(RedisConnectionFactory followConnectionFactory) {
+        return RedisCacheManager.builder(followConnectionFactory)
+                .cacheDefaults(redisCacheConfig(Duration.ZERO, "follower::"))
+                .withInitialCacheConfigurations(cacheConfigurations())
+                .transactionAware()
+                .build();
+    }
+
+    private RedisCacheConfiguration redisCacheConfig(Duration ttl, String prefix) {
+        return defaultCacheConfig()
+                .entryTtl(ttl)
+                .computePrefixWith(cacheName -> prefix + "::" + cacheName)
+                .disableCachingNullValues();
+    }
+
+    private Map<String, RedisCacheConfiguration> cacheConfigurations() {
+        return Map.of("follow", defaultCacheConfig().entryTtl(Duration.ZERO).prefixCacheNameWith("follow::"),
+                "follower", defaultCacheConfig().entryTtl(Duration.ZERO).prefixCacheNameWith("follower::"));
+
+    }
 }

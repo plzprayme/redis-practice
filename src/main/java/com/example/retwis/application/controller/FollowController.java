@@ -1,4 +1,4 @@
-package com.example.retwis.infrastructure.redis.controller;
+package com.example.retwis.application.controller;
 
 import com.example.retwis.application.service.FollowService;
 import lombok.RequiredArgsConstructor;
@@ -8,17 +8,18 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 @RequiredArgsConstructor
-@RestController("/v1")
+@RestController
 public class FollowController {
 
     private final FollowService followService;
 
-    @PostMapping("/follow/{id}")
+    @PostMapping("/follow/{followId}")
     public String follow(
-            @PathVariable("id") Integer followId,
-            @RequestHeader(value="X-user") Integer followerId
+            @PathVariable String followId,
+            @RequestHeader(value="X-user") String followerId
     ) {
-        followService.follow(followerId, followerId);
+        followService.follow(followId, followerId);
+        return "";
     }
 
 }
